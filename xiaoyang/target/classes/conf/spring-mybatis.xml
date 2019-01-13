@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:c="http://www.springframework.org/schema/c"
+	xmlns:cache="http://www.springframework.org/schema/cache"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+	xmlns:jee="http://www.springframework.org/schema/jee"
+	xmlns:lang="http://www.springframework.org/schema/lang"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:task="http://www.springframework.org/schema/task"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-4.3.xsd
+		http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.3.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-4.3.xsd
+		http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-4.3.xsd
+		http://www.springframework.org/schema/cache http://www.springframework.org/schema/cache/spring-cache-4.3.xsd
+		http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.3.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/lang http://www.springframework.org/schema/lang/spring-lang-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+
+	<!-- 读取数据库配置文件 -->
+	<util:properties id="jdbc"
+		location="classpath:conf/db.properties"></util:properties>
+	<!-- 也可以通过<context:property-placeholder location="classpath:jdbc.properties"/>读取配置文件，用springEL表达式读取配置文件内容时只需要${key}就行 -->
+		
+	<!-- 配置数据库连接池 使用DBCP -->
+	<bean id="dbcp" class="org.apache.commons.dbcp.BasicDataSource"
+		destroy-method="close">
+		<property name="driverClassName" value="#{jdbc.driver}" />
+		<property name="url" value="#{jdbc.url}" />
+		<property name="username" value="#{jdbc.user}" />
+		<property name="password" value="#{jdbc.pwd}" />
+	</bean>
+
+	<bean id="ssf" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dbcp"></property>
+		<property name="mapperLocations"
+			value="classpath:mapper/*.xml"></property>
+	</bean>
+
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="basePackage" value="com.lxx.dao"></property>
+		<!-- 以下为spring与mybatis的整合 但是是过时配置 这整个bean的配置可以用 <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer" 
+			p:basePackage="com.lxx.dao" p:sqlSessionFactoryBeanName="ssf"></bean>代替 -->
+		<property name="sqlSessionFactory" ref="ssf"></property>
+	</bean>
+	
+	
+	<!-- 通过注解进行事物管理 -->
+	<!-- 1.配置spring的声明式事物 配置事物管理器 不同的数据层框架管理器类 TransactionManager 也许不同 -->
+	<!-- <bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dbcp"></property>
+	</bean>  -->
+	<!-- 2.配置事物注解驱动 启用事物注解 -->
+	
+	<!-- <tx:annotation-driven transaction-manager="transactionManager"/>  -->
+	<!-- 3.①在需要事物管理的方法上添加 @Transactional注解即可进行事物管理 
+		 ②可以给注解@Transactional 添加属性 propagation 指定事物的传播行为 @Transactional(propagation=Propagation.REQUIRES) 
+		 ③可以给注解@Transactional 添加属性 isolation 指定事物的隔离级别 @Transactional(propagation=Propagation.REQUIRES,isolation=READ_COMMITTED)
+		 ④可以给注解@Transactional 添加属性 noRollbackFor 指定事物对那些异常不进行回滚操作 
+		 @Transactional(propagation=Propagation.REQUIRES,isolation=READ_COMMITTED,noRollback={Exception.class})
+		 默认情况下spring对运行时异常都会进行回滚操作,所以一般不添加此属性
+		 ⑤可以给注解@Transaciotnal 添加属性 readOnly属性 指定事物是否为只读 
+		 @Transactional(propagation=Propagation.REQUIRES,isolation=READ_COMMITTED，readOnly=ture)
+		 表示这个事物只读取数据库数据但不更新数据库数据 这个方法将不进行事物操作，提高性能 
+		 ⑥可以给注解@Transactional 添加属性 timeout 指定事物经过多少时间后若还未执行成功将进行强制回滚 
+		 @Transactional(propagation=Propagation.REQUIRES,isolation=READ_COMMITTED，readOnly=ture,timeout=n秒)  -->
+		 
+	<!-- 通过xml配置 进行事物管理 -->
+	<!-- 1.配置事物管理器 -->
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dbcp"></property>
+	</bean>
+	
+	<!-- 2.配置事物属性 -->
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+		<!-- 根据方法名指定事物的属性 可以是任意属性 -->
+			<tx:method name="methodName" propagation="REQUIRED"/><!-- 通常使用REQUIRED -->
+			<tx:method name="get*" read-only="false"/><!-- 方法名可以用表达式 -->
+			<tx:method name="*"/><!-- 使用默认值 -->
+		</tx:attributes>
+	</tx:advice>
+	
+	<!-- 3.配置事物切入点 以及将事物切入点与事物属性进行关联 -->
+	<aop:config>
+	<!-- 配置事物切入点 -->
+		<aop:pointcut expression="execution(* com.lxx.*.*(..))" id="txPointcut"/>
+		<!-- 将事物切入点与事物属性进行关联 -->
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="txPointcut"/>
+	</aop:config>
+</beans>
